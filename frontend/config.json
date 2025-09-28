@@ -1,0 +1,7 @@
+{
+  "default": "gemma3:4b",
+  "models": [
+    { "id": "gemma3:4b", "name": "Gemma 3 Small" },
+    { "id": "gemma3:1b", "name": "Gemma 3 Tiny" }
+  ]
+}
