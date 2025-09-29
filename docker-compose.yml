@@ -1,15 +1,29 @@
-version: "3.9"
-
 services:
   ollama:
-    image: ollama/ollama
+    image: ollama/ollama:latest
     container_name: ollama
+    restart: always
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    restart: unless-stopped
+    command: serve  # Startet den Server im Vordergrund
+    depends_on:
+      - ollama-init
 
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: >
+      sh -c "
+        ollama serve & 
+        sleep 5 &&
+        ollama pull gemma3:4b &&
+        ollama pull gemma3:1b
+      "
+    restart: "no"
   backend:
     build: ./backend
     container_name: backend
