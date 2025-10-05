@@ -1,0 +1,78 @@
+name: Build and push Docker Compose images to ECR
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR repositories exist
+        env:
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+        run: |
+          set -e
+          # Backend repo
+          if ! aws ecr describe-repositories --repository-names ollama-chat-backend > /dev/null 2>&1; then
+            aws ecr create-repository --repository-name ollama-chat-backend
+            echo "Created ECR repository: ollama-chat-backend"
+          else
+            echo "ECR repository ollama-chat-backend exists"
+          fi
+          # Frontend repo
+          if ! aws ecr describe-repositories --repository-names ollama-chat-frontend > /dev/null 2>&1; then
+            aws ecr create-repository --repository-name ollama-chat-frontend
+            echo "Created ECR repository: ollama-chat-frontend"
+          else
+            echo "ECR repository ollama-chat-frontend exists"
+          fi
+
+      - name: Build images with docker-compose
+        env:
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          docker compose -f docker-compose.yml build --parallel
+
+      - name: Push images to ECR (tagged with SHA and latest)
+        env:
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          set -e
+          # push the images that were built and tagged by docker-compose
+          docker push ${ECR_REGISTRY}/ollama-chat-backend:${IMAGE_TAG}
+          docker tag ${ECR_REGISTRY}/ollama-chat-backend:${IMAGE_TAG} ${ECR_REGISTRY}/ollama-chat-backend:latest
+          docker push ${ECR_REGISTRY}/ollama-chat-backend:latest
+
+          docker push ${ECR_REGISTRY}/ollama-chat-frontend:${IMAGE_TAG}
+          docker tag ${ECR_REGISTRY}/ollama-chat-frontend:${IMAGE_TAG} ${ECR_REGISTRY}/ollama-chat-frontend:latest
+          docker push ${ECR_REGISTRY}/ollama-chat-frontend:latest
+
+      - name: Output pushed image tags
+        run: |
+          echo "Pushed images:"
+          echo "${ECR_REGISTRY}/ollama-chat-backend:${IMAGE_TAG}"
+          echo "${ECR_REGISTRY}/ollama-chat-frontend:${IMAGE_TAG}"
