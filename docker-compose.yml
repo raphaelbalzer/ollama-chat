@@ -25,6 +25,7 @@ services:
       "
     restart: "no"
   backend:
+    image: ${ECR_REGISTRY}/ollama-chat-backend:${IMAGE_TAG}
     build: ./backend
     container_name: backend
     depends_on:
@@ -35,6 +36,7 @@ services:
       - OLLAMA_HOST=http://ollama:11434
 
   frontend:
+    image: ${ECR_REGISTRY}/ollama-chat-frontend:${IMAGE_TAG}
     build: ./frontend
     container_name: frontend
     depends_on:
